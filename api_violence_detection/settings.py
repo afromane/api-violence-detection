@@ -25,8 +25,13 @@ SECRET_KEY = '=_km-)5iyu)qymn3*b#(+i*d18a#e7db^nm!39e$j$)c34w&18'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = [
+    '192.168.100.21',
+    '127.0.0.1'
+]
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:4200',   
+]
 
 # Application definition
 
@@ -37,7 +42,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'detect_violence'
+    'detect_violence',
+    'corsheaders' # Pour resoudre le probleme du cors
 ]
 
 MIDDLEWARE = [
@@ -48,6 +54,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
 ]
 
 ROOT_URLCONF = 'api_violence_detection.urls'
@@ -119,3 +126,5 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/2.2/howto/static-files/
 
 STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, STATIC_URL)
+MEDIA_ROOT = os.path.join(BASE_DIR, STATIC_URL,"upload")
