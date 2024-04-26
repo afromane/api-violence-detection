@@ -39,16 +39,31 @@ def upload(request):
             
             #Video path
             VIDEO_PATH = settings.BASE_DIR+"/"+upload_dir+filename
-            violence_prediction_timestamps = detector.predict_frames_parallel(VIDEO_PATH)
+            analysis_result = detector.predict_frames_parallel(VIDEO_PATH)
             return JsonResponse({
                 'message': 'Form data received successfully',
-                'file url' : upload_dir+filename,
-                'totauxVolience' : violence_prediction_timestamps
+                'file_url' : upload_dir+filename,
+                'totauxViolence' : analysis_result
                 }, status=200)
         else:
             return JsonResponse({'error': 'No form data received'}, status=400)
     else:
         return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+def serve_video(request):
+    # Chemin vers le fichier vidéo
+    #video_path = os.path.join('chemin/vers/votre/dossier/videos', video_name)
+    video_name = request.GET.get('video')
+
+    video_path = settings.BASE_DIR+"/"+video_name
+    # Vérifie si le fichier vidéo existe
+    if os.path.exists(video_path):
+        with open(video_path, 'rb') as video_file:
+            response = HttpResponse(video_file.read(), content_type='video/mp4')
+            response['Content-Disposition'] = f'inline; filename="{video_name}"'
+            return response
+    else:
+        return HttpResponse('La vidéo demandée n\'existe pas', status=404)
 
 def get_video(request, video_name):
     # Chemin vers le fichier vidéo
@@ -63,7 +78,6 @@ def get_video(request, video_name):
     else:
         return HttpResponse('La vidéo demandée n\'existe pas', status=404)
 
- 
 def video_from_camera(request):
     def generate_video(video_url,frame_delay):
         detector = DectectViolenceAPI()

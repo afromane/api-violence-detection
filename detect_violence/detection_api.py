@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import concurrent.futures
 from datetime import datetime
-
+import time
 from collections import deque
 import tensorflow as tf
 from django.conf import settings
@@ -15,35 +15,33 @@ class DectectViolenceAPI:
     SEQUENCE_LENGTH = 24
     CLASSES_LIST = ["NonViolence", "Violence"]
 
-    def __init__(self, save_target='test_video'):
-
-   
+    def __init__(self, save_target='test_video', violence_threshold=10, detection_interval=60, detected_frames_dir='detected_frames'):
         self.model_list = [
-            #settings.STATIC_ROOT+ "model/model_0_500.h5"
             settings.BASE_DIR+"/static/model/seq24/model_0_300_f600.h5",
             settings.BASE_DIR+"/static/model/seq24/model_300_600_f600.h5",
-            settings.BASE_DIR+"/static/model/seq24/model_600_900_f600.h5",
-            # settings.BASE_DIR+"/static/model/seq24/model_900_1153_f506.h5",
+            settings.BASE_DIR+"/static/model/seq24/model_600_900_f506.h5",
+            settings.BASE_DIR+"/static/model/seq24/1.h5",
         ]
-
         self.model_list = [keras.models.load_model(model_path) for model_path in self.model_list]
+        self.detected_frames_dir = detected_frames_dir
+        self.violence_threshold = violence_threshold
+        self.detection_interval = detection_interval
 
-        os.makedirs(save_target, exist_ok=True)
+        os.makedirs(self.detected_frames_dir, exist_ok=True)
 
         current_time = datetime.now().time()
         formatted_time = current_time.strftime("%H-%M-%S")
         self.output_file_path = f'{save_target}/Output_{formatted_time}.mp4'
-    
-    def predict_frames_parallel(self, video_file_path):
-        violence_prediction_timestamps =[]
-        video_reader = cv2.VideoCapture(video_file_path)
-        original_video_width = int(video_reader.get(cv2.CAP_PROP_FRAME_WIDTH))
-        original_video_height = int(video_reader.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        video_writer = cv2.VideoWriter(self.output_file_path, cv2.VideoWriter_fourcc('m', 'p', '4', 'v'),
-                                       video_reader.get(cv2.CAP_PROP_FPS), (original_video_width, original_video_height))
-        frames_queue = deque(maxlen=self.SEQUENCE_LENGTH)
-        predicted_class_name = ''
 
+    def predict_frames_parallel(self, video_file_path):
+        video_reader = cv2.VideoCapture(video_file_path)
+        total_video_duration = video_reader.get(cv2.CAP_PROP_FRAME_COUNT) / video_reader.get(cv2.CAP_PROP_FPS)
+
+        violence_count = 0
+        non_violence_count = 0
+        frames_queue = deque(maxlen=self.SEQUENCE_LENGTH)
+        detected_frames = []
+        detection_times = []
         def predict_with_model(model, frames_queue):
             try:
                 return model.predict(np.expand_dims(frames_queue, axis=0))[0]
@@ -72,22 +70,50 @@ class DectectViolenceAPI:
                             all_predicted_probabilities.append(predicted_labels_probabilities)
 
                 average_predicted_probabilities = np.mean(all_predicted_probabilities, axis=0)
-                predicted_label = np.argmax(average_predicted_probabilities)
-                predicted_class_name = self.CLASSES_LIST[predicted_label]
+                predicted_label_index = np.argmax(average_predicted_probabilities)
 
-            if predicted_class_name == "Violence":
-                cv2.putText(frame, predicted_class_name, (5, 100), cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 0, 255), 12)
-                violence_prediction_timestamps.append(video_reader.get(cv2.CAP_PROP_POS_MSEC))
+                predicted_label = self.CLASSES_LIST[predicted_label_index]
 
-            """  else:
-                cv2.putText(frame, predicted_class_name, (5, 100), cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 255, 0), 12) """
+                if predicted_label == "Violence":
+                    violence_count += 1
+                    detected_frames.append(frame)
+                else:
+                    non_violence_count += 1
 
-            video_writer.write(frame)
+            elapsed_time = video_reader.get(cv2.CAP_PROP_POS_MSEC) / 1000
+            if elapsed_time >= self.detection_interval:
+                break
 
         video_reader.release()
-        video_writer.release()
-        return violence_prediction_timestamps
-   
+
+        violence_percentage = (violence_count / (violence_count + non_violence_count)) * 100
+        non_violence_percentage = 100 - violence_percentage
+
+        if violence_count >= self.violence_threshold:
+            save_directory = self.save_detected_frames(detected_frames, elapsed_time)
+            detection_times.append(elapsed_time)  # Convert to seconds
+
+            return violence_percentage, non_violence_percentage, save_directory,detection_times
+        else:
+            return violence_percentage, non_violence_percentage, None,None
+    
+    def save_detected_frames(self, frames, detection_start_time):
+        current_date = time.strftime("%Y-%m-%d", time.localtime(detection_start_time))
+        interval_start = time.strftime("%H-%M-%S", time.localtime(detection_start_time))
+        interval_end = time.strftime("%H-%M-%S", time.localtime(detection_start_time + self.detection_interval))
+        interval_folder_name = f'{current_date}/{interval_start}:{interval_end}'
+
+        save_directory = os.path.join(self.detected_frames_dir, interval_folder_name)
+
+        if not os.path.exists(save_directory):
+            os.makedirs(save_directory)
+
+        for idx, frame in enumerate(frames):
+            cv2.imwrite(os.path.join(save_directory, f'detected_frame_{idx}.jpg'), frame)
+
+        return save_directory
+
+
     def predict_images(self, images_list):
         
       frames_queue = deque(maxlen=self.SEQUENCE_LENGTH)
@@ -122,4 +148,3 @@ class DectectViolenceAPI:
               predicted_class_name = self.CLASSES_LIST[predicted_label]
 
       return predicted_class_name,average_predicted_probabilities
-

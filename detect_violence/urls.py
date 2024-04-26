@@ -7,6 +7,7 @@ urlpatterns = [
     path('', views.home, name='home'),
     path('upload', views.upload, name='upload_video'),
     path('video/<str:video_name>/',views.get_video, name="serve_video"),
+    path('loadVideo',views.serve_video),
     #path('live_test',views.video_from_camera_1 ),
     #path('live/<str:ip>/',views.video_from_camera, ),
     path('live', views.video_from_camera),
