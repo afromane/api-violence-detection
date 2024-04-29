@@ -26,40 +26,11 @@ from .object_detect_with_ssd import SsdObjectDetection
 """
 NOSQL DATABSE : MONGODB
 """
-import pymongo
 def home(request):
-    client = pymongo.MongoClient('mongodb://http://192.168.100.6:27017/')
-    db = client['mydatabase']
-    # Création de la collection
-    collection = db['mycollection']  # Remplacez 'mycollection' par le nom de votre collection
-
-    # Vous pouvez également spécifier des options lors de la création de la collection
-    # collection = db.create_collection('mycollection', capped=True, size=100000)
-
-    # Insérer des documents dans la collection
-    data = [
-        {"name": "John", "age": 30},
-        {"name": "Alice", "age": 25},
-        {"name": "Bob", "age": 35}
-    ]
-    collection.insert_many(data)
-
-    # Vérifier si la collection a été créée avec succès
-    if 'mycollection' in db.list_collection_names():
-        print("La collection 'mycollection' a été créée avec succès.")
-    else:
-        print("La création de la collection a échoué.")
-
-    # Perform operations using pymongo
-    result = collection.find_one({'name': 'John'})
-    # Do something with the result
-
-R
    return JsonResponse(
     {
         'message': 'Video processed successfully',
-        'path' : settings.BASE_DIR,
-        'mongo' : result
+        'path' : settings.BASE_DIR
     }
 
     )  

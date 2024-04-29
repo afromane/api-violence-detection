@@ -43,7 +43,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'detect_violence',
-    'corsheaders' # Pour resoudre le probleme du cors
+    'corsheaders', # Pour resoudre le probleme du cors
+    'djongo',# database
 ]
 
 MIDDLEWARE = [
@@ -89,15 +90,15 @@ DATABASES = {
 } """
 DATABASES = {
     'default': {
-        'ENGINE': 'django_mongodb_engine',
-        'NAME': 'violence_detection',
-        # 'HOST': 'localhost',
-        'HOST': 'http://192.168.100.6',
+        'ENGINE': 'djongo',
+        'NAME': 'violenceDetection',
+        'HOST': 'mongodb://http://192.168.100.6:27017/',
         'PORT': 27017,
-        # Other options such as user and password can also be specified if needed
+        'CONN_MAX_AGE': None, 
     }
 }
 
+  
 
 # Password validation
 # https://docs.djangoproject.com/en/2.2/ref/settings/#auth-password-validators
