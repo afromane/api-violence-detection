@@ -16,11 +16,50 @@ from imutils.object_detection import non_max_suppression
 import numpy as np
 import time
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
+"""
+            Object detection
+"""
+from .object_detect_with_yolo import YoloObjectDetection
+from .object_detect_with_ssd import SsdObjectDetection
+
+"""
+NOSQL DATABSE : MONGODB
+"""
+import pymongo
 def home(request):
+    client = pymongo.MongoClient('mongodb://http://192.168.100.6:27017/')
+    db = client['mydatabase']
+    # Création de la collection
+    collection = db['mycollection']  # Remplacez 'mycollection' par le nom de votre collection
+
+    # Vous pouvez également spécifier des options lors de la création de la collection
+    # collection = db.create_collection('mycollection', capped=True, size=100000)
+
+    # Insérer des documents dans la collection
+    data = [
+        {"name": "John", "age": 30},
+        {"name": "Alice", "age": 25},
+        {"name": "Bob", "age": 35}
+    ]
+    collection.insert_many(data)
+
+    # Vérifier si la collection a été créée avec succès
+    if 'mycollection' in db.list_collection_names():
+        print("La collection 'mycollection' a été créée avec succès.")
+    else:
+        print("La création de la collection a échoué.")
+
+    # Perform operations using pymongo
+    result = collection.find_one({'name': 'John'})
+    # Do something with the result
+
+R
    return JsonResponse(
     {
         'message': 'Video processed successfully',
-        'path' : settings.BASE_DIR
+        'path' : settings.BASE_DIR,
+        'mongo' : result
     }
 
     )  
@@ -183,37 +222,16 @@ def process_frames(video_url):
 
 
 
-def video_from_camera_fast_detection(request):
+def videoFromCameraWithSsd(request):
     # Détection d'objets avec MobileNetSSD
     VIOLENCE_THRESHOLD = 10  # Nombre minimum de détections de violence pour signaler
     DETECTION_INTERVAL = 60  # Intervalle de détection en secondes
     violence_predictions = []  # Liste pour stocker les prédictions de violence
     detected_frames = []  # Liste pour stocker les prédictions de violence
 
-    def detect_objects_mobilenet(frame):
-        # Charger le modèle pré-entraîné MobileNetSSD
-        prototxt_path = settings.BASE_DIR + "/static/MobileNet_SSD/MobileNetSSD_deploy.prototxt.txt"
-        model_path = settings.BASE_DIR + "/static/MobileNet_SSD/MobileNetSSD_deploy.caffemodel"
-        net = cv2.dnn.readNetFromCaffe(prototxt_path, model_path)
-
-        # Prétraiter l'image et l'envoyer à travers le réseau de neurones
-        blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)), 0.007843, (300, 300), 127.5)
-        net.setInput(blob)
-        detections = net.forward()
-
-        # Traiter les détections
-        for i in range(detections.shape[2]):
-            confidence = detections[0, 0, i, 2]
-
-            # Filtrer les détections avec une confiance minimale
-            if confidence > 0.2:
-                box = detections[0, 0, i, 3:7] * np.array([frame.shape[1], frame.shape[0], frame.shape[1], frame.shape[0]])
-                (startX, startY, endX, endY) = box.astype("int")
-
-                # Dessiner la boîte englobante et le label sur l'image
-                cv2.rectangle(frame, (startX, startY), (endX, endY), (0, 255, 0), 2)
-
-        return frame
+    def object_detection(frame):
+        detect = SsdObjectDetection()
+        return detect.detect_person(frame)
 
     def process_frames_mobilenet(video_url, frame_delay):
         # Démarrer le flux vidéo à partir de l'URL
@@ -283,7 +301,106 @@ def video_from_camera_fast_detection(request):
             wait_time = max(0, frame_delay - elapsed_time)
             time.sleep(wait_time)
 
-    def save_detected_frames(frames, detection_start_time):
+    video_url_param = request.GET.get('video_url')
+    if video_url_param:
+        frame_delay = 1.0 / 30
+        video_url = 'http://' + video_url_param + '/video'
+        return StreamingHttpResponse(process_frames_mobilenet(video_url, frame_delay), content_type='multipart/x-mixed-replace; boundary=frame')
+    else:
+        return HttpResponseBadRequest("Missing or invalid 'video_url' parameter ")
+
+
+def videoFromCameraWithYolo(request):
+    VIOLENCE_THRESHOLD = 10  # Nombre minimum de détections de violence pour signaler
+    DETECTION_INTERVAL = 60  # Intervalle de détection en secondes
+    violence_predictions = []  # Liste pour stocker les prédictions de violence
+    detected_frames = []  # Liste pour stocker les prédictions de violence
+
+    def object_detection(frame):
+        detect = YoloObjectDetection()
+        return detect.detect_person(frame)
+
+    def process_frames_mobilenet(video_url, frame_delay):
+        # Démarrer le flux vidéo à partir de l'URL
+        vs = cv2.VideoCapture(video_url)
+        detector = DectectViolenceAPI()
+        frames_to_predict = []
+        violence_count = 0
+        start_time = time.time()
+        detection_start_time = time.time()
+
+        while True:
+            # Lire le cadre actuel du flux vidéo
+            ret, frame = vs.read()
+            # Vérifier si la lecture du cadre a réussi
+            if not ret:
+                break
+
+            # Détecter les objets dans le cadre
+            frames_to_predict.append(frame)
+            frame_with_prediction = frame.copy()  # Copie du cadre pour dessiner les prédictions
+            frame = object_detection(frame)
+
+
+            if len(frames_to_predict) == 24:
+                # Prédiction de cadences-frames
+                prediction = detector.predict_images(frames_to_predict)
+
+                # Vérifier si la prédiction est une violence
+                if prediction[0] == "Violence":
+                    violence_count += 1
+                    # Ajouter les frames détectés à la liste
+                    detected_frames.extend(frames_to_predict)
+
+                    # Vérifier si le seuil de violence a été atteint dans l'intervalle de détection
+                    if violence_count >= VIOLENCE_THRESHOLD:
+                        # Calculer le temps écoulé depuis le début de la période
+                        elapsed_time = time.time() - detection_start_time
+
+                        # Si le temps écoulé est inférieur à l'intervalle de détection, lancer l'alerte
+                        if elapsed_time < DETECTION_INTERVAL:
+                            print("Alerte ! Plus de 10 cas de violence détectés en 1 minute.")
+                            # Réinitialiser le compteur de violence
+                            violence_count = 0
+                            # Réinitialiser le temps de début de la période
+                            detection_start_time = time.time()
+                            # Enregistrer les frames détectées après l'alerte dans un dossier spécifique
+                            save_detected_frames(detected_frames, detection_start_time)
+
+                frames_to_predict = []
+
+                # Dessiner la prédiction sur le cadre
+                frame = cv2.putText(frame, "Prediction: {}".format(prediction), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            
+            ret, jpeg = cv2.imencode('.jpg', frame)
+            frame_bytes = jpeg.tobytes()
+
+            # Convertir le cadre en format JPEG
+            (flag, encodedImage) = cv2.imencode(".jpg", frame)
+
+            # Assurer que l'encodage a réussi
+            if flag:
+                # Renvoyer le flux d'images encodées en format byte
+                yield (b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + bytearray(encodedImage) + b'\r\n')
+
+            elapsed_time = time.time() - start_time
+            wait_time = max(0, frame_delay - elapsed_time)
+            time.sleep(wait_time)
+
+
+    video_url_param = request.GET.get('video_url')
+    if video_url_param:
+        frame_delay = 1.0 / 30
+        video_url = 'http://' + video_url_param + '/video'
+        return StreamingHttpResponse(process_frames_mobilenet(video_url, frame_delay), content_type='multipart/x-mixed-replace; boundary=frame')
+    else:
+        return HttpResponseBadRequest("Missing or invalid 'video_url' parameter ")
+
+
+"""
+        Save detected frames
+"""
+def save_detected_frames(frames, detection_start_time):
         # Créer un nom de dossier basé sur la date et l'intervalle de détection
         current_date = time.strftime("%Y-%m-%d", time.localtime(detection_start_time))
         interval_start = time.strftime("%H-%M-%S", time.localtime(detection_start_time))
@@ -299,17 +416,7 @@ def video_from_camera_fast_detection(request):
 
         # Enregistrer chaque frame détecté dans le répertoire spécifié
         for idx, frame in enumerate(frames):
-            cv2.imwrite(os.path.join(save_directory, f'detected_frame_{idx}.jpg'), frame)
-
-    video_url_param = request.GET.get('video_url')
-    if video_url_param:
-        frame_delay = 1.0 / 30
-        video_url = 'http://' + video_url_param + '/video'
-        return StreamingHttpResponse(process_frames_mobilenet(video_url, frame_delay), content_type='multipart/x-mixed-replace; boundary=frame')
-    else:
-        return HttpResponseBadRequest("Missing or invalid 'video_url' parameter ")
-
-
+            cv2.imwrite(os.path.join(save_directory, f'frame_{idx}.jpg'), frame)
 
 
 
@@ -427,7 +534,6 @@ def video_from_camera_precision_detection(request):
         model_path = "/home/modafa-pc/Bureau/violence-detection/faster_rcnn_inception_v2_coco_2018_01_28/frozen_inference_graph.pb"
         odapi = DetectorAPI(path_to_ckpt=model_path)
         threshold = 0.7
-
         boxes, scores, classes, num = odapi.processFrame(image)
         person_count = 0
         max_accuracy = 0
@@ -485,6 +591,7 @@ def video_from_camera_precision_detection(request):
     else:
         # Retourner une réponse BadRequest si le paramètre 'video_url' est manquant
         return HttpResponseBadRequest("Missing or invalid 'video_url' parameter ")
+
 
 
 """ 

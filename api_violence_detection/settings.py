@@ -80,11 +80,21 @@ WSGI_APPLICATION = 'api_violence_detection.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/2.2/ref/settings/#databases
-
+""" 
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+    }
+} """
+DATABASES = {
+    'default': {
+        'ENGINE': 'django_mongodb_engine',
+        'NAME': 'violence_detection',
+        # 'HOST': 'localhost',
+        'HOST': 'http://192.168.100.6',
+        'PORT': 27017,
+        # Other options such as user and password can also be specified if needed
     }
 }
 

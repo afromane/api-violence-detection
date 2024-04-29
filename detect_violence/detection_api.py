@@ -19,8 +19,8 @@ class DectectViolenceAPI:
         self.model_list = [
             settings.BASE_DIR+"/static/model/seq24/model_0_300_f600.h5",
             settings.BASE_DIR+"/static/model/seq24/model_300_600_f600.h5",
-            settings.BASE_DIR+"/static/model/seq24/model_600_900_f506.h5",
-            settings.BASE_DIR+"/static/model/seq24/1.h5",
+            settings.BASE_DIR+"/static/model/seq24/model_600_900_f600.h5",
+            settings.BASE_DIR+"/static/model/seq24/model_900_1153_f506.h5",
         ]
         self.model_list = [keras.models.load_model(model_path) for model_path in self.model_list]
         self.detected_frames_dir = detected_frames_dir

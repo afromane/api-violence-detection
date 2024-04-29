@@ -11,6 +11,7 @@ urlpatterns = [
     #path('live_test',views.video_from_camera_1 ),
     #path('live/<str:ip>/',views.video_from_camera, ),
     path('live', views.video_from_camera),
-     path('fastDetection', views.video_from_camera_fast_detection),
+     path('videoFromCameraWithSsd', views.videoFromCameraWithSsd),
      path('precisionDetection', views.video_from_camera_precision_detection),
+     path('videoFromCameraWithYolo', views.videoFromCameraWithYolo),
 ]
