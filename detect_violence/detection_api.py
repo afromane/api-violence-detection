@@ -109,7 +109,7 @@ class DectectViolenceAPI:
             os.makedirs(save_directory)
 
         for idx, frame in enumerate(frames):
-            cv2.imwrite(os.path.join(save_directory, f'detected_frame_{idx}.jpg'), frame)
+            cv2.imwrite(os.path.join(save_directory, f'frame_{idx}.jpg'), frame)
 
         return save_directory
 

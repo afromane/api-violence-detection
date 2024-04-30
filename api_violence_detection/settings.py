@@ -33,6 +33,7 @@ CORS_ALLOWED_ORIGINS = [
     'http://localhost:4200',   
 ]
 
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -82,23 +83,28 @@ WSGI_APPLICATION = 'api_violence_detection.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/2.2/ref/settings/#databases
 
-DATABASES = {
+""" DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
     }
-} 
-""" DATABASES = {
+}  """
+
+DATABASES = {
     'default': {
         'ENGINE': 'djongo',
+        'CLIENT': {
+            'host': '192.168.100.8', # Replace with your MongoDB server address
+            # 'host': 'localhost', # Replace with your MongoDB server address
+            'port': 27017,               # Replace with your MongoDB port if different
+            #'username': 'your_username', # Replace with your MongoDB username (optional)
+            #'password': 'your_password', # Replace with your MongoDB password (optional)
+            #'authSource': 'your_auth_database', # Replace with your MongoDB authentication database (optional)
+        },
         'NAME': 'violenceDetection',
-        'HOST': 'mongodb://http://192.168.100.6:27017/',
-        'PORT': 27017,
-        'CONN_MAX_AGE': None, 
+        'CONN_MAX_AGE': None,
     }
-} """
-
-  
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/2.2/ref/settings/#auth-password-validators

@@ -24,13 +24,16 @@ from .object_detect_with_yolo import YoloObjectDetection
 from .object_detect_with_ssd import SsdObjectDetection
 
 """
-NOSQL DATABSE : MONGODB
+        MODELS
 """
+from .models import RecordedVideo,ViolenceEvent
+from bson import ObjectId  # Import ObjectId from bson
 def home(request):
-   return JsonResponse(
+
+    print(RecordedVideo.objects.all())
+    return JsonResponse(
     {
         'message': 'Video processed successfully',
-        'path' : settings.BASE_DIR
     }
 
     )  
@@ -50,10 +53,37 @@ def upload(request):
             #Video path
             VIDEO_PATH = settings.BASE_DIR+"/"+upload_dir+filename
             analysis_result = detector.predict_frames_parallel(VIDEO_PATH)
+            #Save video to database
+            recorded_video = RecordedVideo.objects.create(
+                name= request.POST.get('name'),
+                description=request.POST.get('description'),
+                path=upload_dir+filename
+            )
+            #recorded_video.save()
+            #save detected 
+            _violence = analysis_result[0]
+            _non_violence = analysis_result[1]
+            _save_directory  = analysis_result[2]
+            _cadence = request.POST.get("cadence")
+
+            violence_event  = ViolenceEvent.objects.create(
+                cadence = _cadence,
+                violence = _violence,
+                non_violence = _non_violence,
+                path_frame = _save_directory,
+                #path_video = models.TextField(blank=True)
+                #interval = models.ArrayField(model_container=models.FloatField(),default=list )
+                video_stream = recorded_video
+            )
+            latest_event = ViolenceEvent.objects.order_by('-createdAt').first()
+            print(latest_event._id)
             return JsonResponse({
                 'message': 'Form data received successfully',
-                'file_url' : upload_dir+filename,
-                'totauxViolence' : analysis_result
+                'id' : str(latest_event._id),
+                'cadence' : latest_event.cadence,
+                'violence' : latest_event.violence,
+                'non_violence' : latest_event.non_violence,
+                'video_stream' : video_stream,
                 }, status=200)
         else:
             return JsonResponse({'error': 'No form data received'}, status=400)
