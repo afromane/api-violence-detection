@@ -14,4 +14,7 @@ urlpatterns = [
      path('videoFromCameraWithSsd', views.videoFromCameraWithSsd),
      path('precisionDetection', views.video_from_camera_precision_detection),
      path('videoFromCameraWithYolo', views.videoFromCameraWithYolo),
+     path('getEventViolenceFromRecordedVideo/<str:event_id>', views.getEventViolenceFromRecordedVideo),
+    path('getFolderContent', views.get_folder_content),
+    path('getAllEventViolent', views.get_all_violence_events),
 ]

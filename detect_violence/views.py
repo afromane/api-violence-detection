@@ -17,17 +17,13 @@ import numpy as np
 import time
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
-"""
-            Object detection
-"""
 from .object_detect_with_yolo import YoloObjectDetection
 from .object_detect_with_ssd import SsdObjectDetection
-
-"""
-        MODELS
-"""
-from .models import RecordedVideo,ViolenceEvent
+from .models import RecordedVideo,ViolenceEvent,VideoStream
+from djongo.models import ObjectIdField
 from bson import ObjectId  # Import ObjectId from bson
+from django.core.serializers import serialize
+import json
 def home(request):
 
     print(RecordedVideo.objects.all())
@@ -79,11 +75,7 @@ def upload(request):
             print(latest_event._id)
             return JsonResponse({
                 'message': 'Form data received successfully',
-                'id' : str(latest_event._id),
-                'cadence' : latest_event.cadence,
-                'violence' : latest_event.violence,
-                'non_violence' : latest_event.non_violence,
-                'video_stream' : video_stream,
+                'id' : str(latest_event._id)
                 }, status=200)
         else:
             return JsonResponse({'error': 'No form data received'}, status=400)
@@ -155,72 +147,6 @@ def video_from_camera(request):
     video_url = 'http://192.168.100.7:4747/video'
     frame_delay = 1.0/60
     return StreamingHttpResponse(generate_video(video_url,frame_delay), content_type='multipart/x-mixed-replace; boundary=frame') 
-
-
-""" # Détection d'objets avec MobileNetSSD
-def detect_objects(frame):
-    # Charger le modèle pré-entraîné MobileNetSSD
-    prototxt_path = "/home/modafa-pc/Bureau/violence-detection/program/api-violence-detection/static/MobileNet_SSD/MobileNetSSD_deploy.prototxt.txt"
-    model_path = "/home/modafa-pc/Bureau/violence-detection/program/api-violence-detection/static/MobileNet_SSD/MobileNetSSD_deploy.caffemodel"
-    net = cv2.dnn.readNetFromCaffe(prototxt_path, model_path)
-
-    # Prétraiter l'image et l'envoyer à travers le réseau de neurones
-    blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)), 0.007843, (300, 300), 127.5)
-    net.setInput(blob)
-    detections = net.forward()
-
-    # Traiter les détections
-    for i in range(detections.shape[2]):
-        confidence = detections[0, 0, i, 2]
-
-        # Filtrer les détections avec une confiance minimale
-        if confidence > 0.2:
-            box = detections[0, 0, i, 3:7] * np.array([frame.shape[1], frame.shape[0], frame.shape[1], frame.shape[0]])
-            (startX, startY, endX, endY) = box.astype("int")
-            #label
-            #label = "{}: {:.2f}%".format(CLASSES[idx], confidence*100)
-            #print("[INFO] {}".format(label))
-
-            # Dessiner la boîte englobante et le label sur l'image
-            cv2.rectangle(frame, (startX, startY), (endX, endY), (0, 255, 0), 2)
-
-    return frame
-# Traitement en parallèle des images
-def process_frames(video_url):
-    # Démarrer le flux vidéo à partir de l'URL
-    vs = cv2.VideoCapture(video_url)
-
-    while True:
-        # Lire le cadre actuel du flux vidéo
-        ret, frame = vs.read()
-
-        # Vérifier si la lecture du cadre a réussi
-        if not ret:
-            break
-
-        # Détecter les objets dans le cadre
-        frame = detect_objects(frame)
-
-        # Convertir le cadre en format JPEG
-        (flag, encodedImage) = cv2.imencode(".jpg", frame)
-
-        # Assurer que l'encodage a réussi
-        if flag:
-            # Renvoyer le flux d'images encodées en format byte
-            yield (b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + bytearray(encodedImage) + b'\r\n')
- """
-""" def video_from_camera(request):
-     # Obtenir l'URL de la vidéo de la requête GET
-    video_url_param =  request.GET.get('video_url')
-
-    if video_url_param:
-        video_url = 'http://' + video_url_param + '/video'
-
-        return StreamingHttpResponse(process_frames(video_url), content_type='multipart/x-mixed-replace; boundary=frame') 
-    else:
-        return HttpResponseBadRequest("Missing or invalid 'video_url' parameter ")
-  """
-
 
 
 def videoFromCameraWithSsd(request):
@@ -309,7 +235,6 @@ def videoFromCameraWithSsd(request):
         return StreamingHttpResponse(process_frames_mobilenet(video_url, frame_delay), content_type='multipart/x-mixed-replace; boundary=frame')
     else:
         return HttpResponseBadRequest("Missing or invalid 'video_url' parameter ")
-
 
 def videoFromCameraWithYolo(request):
     VIOLENCE_THRESHOLD = 10  # Nombre minimum de détections de violence pour signaler
@@ -568,7 +493,7 @@ def video_from_camera_precision_detection(request):
             frame_with_boxes, person_count, max_accuracy, max_avg_accuracy = detect_objects_fast_rnn(frame)
             
             text = f"P: {person_count}"
-        # text = f"Person count: {person_count}, Max accuracy: {max_accuracy}, Max average accuracy: {max_avg_accuracy}"
+             # text = f"Person count: {person_count}, Max accuracy: {max_accuracy}, Max average accuracy: {max_avg_accuracy}"
             cv2.putText(frame_with_boxes, text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
             _, jpeg = cv2.imencode('.jpg', frame_with_boxes)
@@ -594,71 +519,6 @@ def video_from_camera_precision_detection(request):
         return HttpResponseBadRequest("Missing or invalid 'video_url' parameter ")
 
 
-
-""" 
-def video_from_camera_fast_detection(request):
-    # Détection d'objets avec MobileNetSSD
-    def detect_objects_mobilenet(frame):
-        # Charger le modèle pré-entraîné MobileNetSSD
-        prototxt_path = "/home/modafa-pc/Bureau/violence-detection/program/api-violence-detection/static/MobileNet_SSD/MobileNetSSD_deploy.prototxt.txt"
-        model_path = "/home/modafa-pc/Bureau/violence-detection/program/api-violence-detection/static/MobileNet_SSD/MobileNetSSD_deploy.caffemodel"
-        net = cv2.dnn.readNetFromCaffe(prototxt_path, model_path)
-
-        # Prétraiter l'image et l'envoyer à travers le réseau de neurones
-        blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)), 0.007843, (300, 300), 127.5)
-        net.setInput(blob)
-        detections = net.forward()
-
-        # Traiter les détections
-        for i in range(detections.shape[2]):
-            confidence = detections[0, 0, i, 2]
-
-            # Filtrer les détections avec une confiance minimale
-            if confidence > 0.2:
-                box = detections[0, 0, i, 3:7] * np.array([frame.shape[1], frame.shape[0], frame.shape[1], frame.shape[0]])
-                (startX, startY, endX, endY) = box.astype("int")
-                #label
-                #label = "{}: {:.2f}%".format(CLASSES[idx], confidence*100)
-                #print("[INFO] {}".format(label))
-
-                # Dessiner la boîte englobante et le label sur l'image
-                cv2.rectangle(frame, (startX, startY), (endX, endY), (0, 255, 0), 2)
-
-        return frame
-    # Traitement en parallèle des images
-    def process_frames_mobilenet(video_url):
-        # Démarrer le flux vidéo à partir de l'URL
-        vs = cv2.VideoCapture(video_url)
-
-        while True:
-            # Lire le cadre actuel du flux vidéo
-            ret, frame = vs.read()
-
-            # Vérifier si la lecture du cadre a réussi
-            if not ret:
-                break
-
-            # Détecter les objets dans le cadre
-            frame = detect_objects_mobilenet(frame)
-
-            # Convertir le cadre en format JPEG
-            (flag, encodedImage) = cv2.imencode(".jpg", frame)
-
-            # Assurer que l'encodage a réussi
-            if flag:
-                # Renvoyer le flux d'images encodées en format byte
-                yield (b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + bytearray(encodedImage) + b'\r\n')
-
-    video_url_param =  request.GET.get('video_url')
-
-    if video_url_param:
-        video_url = 'http://' + video_url_param + '/video'
-
-        return StreamingHttpResponse(process_frames_mobilenet(video_url), content_type='multipart/x-mixed-replace; boundary=frame') 
-    else:
-        return HttpResponseBadRequest("Missing or invalid 'video_url' parameter ")
-    
-def video_from_camera_precision_detection(request):
     def detect_objects_fast_rnn(image):
         model_path = "/home/modafa-pc/Bureau/violence-detection/faster_rcnn_inception_v2_coco_2018_01_28/frozen_inference_graph.pb"
         odapi = DetectorAPI(path_to_ckpt=model_path)
@@ -697,7 +557,7 @@ def video_from_camera_precision_detection(request):
             frame_with_boxes, person_count, max_accuracy, max_avg_accuracy = detect_objects_fast_rnn(frame)
             
             text = f"P: {person_count}"
-        # text = f"Person count: {person_count}, Max accuracy: {max_accuracy}, Max average accuracy: {max_avg_accuracy}"
+            # text = f"Person count: {person_count}, Max accuracy: {max_accuracy}, Max average accuracy: {max_avg_accuracy}"
             cv2.putText(frame_with_boxes, text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
             _, jpeg = cv2.imencode('.jpg', frame_with_boxes)
@@ -721,4 +581,86 @@ def video_from_camera_precision_detection(request):
     else:
         # Retourner une réponse BadRequest si le paramètre 'video_url' est manquant
         return HttpResponseBadRequest("Missing or invalid 'video_url' parameter ")
- """
+
+def getEventViolenceFromRecordedVideo(request, event_id):
+    try:
+        # Retrieve the violence event by its _id
+        event_id = ObjectId(event_id)
+        event = ViolenceEvent.objects.get(_id=event_id)
+        # Fetch details of the associated recorded video
+        recorded_video_details = recorded_video_by_id(str(event.video_stream_id))
+        # Construct the response JSON including violence event details and recorded video details
+        response_data = {
+            '_id': str(event._id),
+            'cadence': event.cadence,
+            'violence': event.violence,
+            'non_violence': event.non_violence,
+            'path_frame': event.path_frame,
+            'path_video': event.path_video,
+            'createdAt': event.createdAt,
+            'recorded_video': recorded_video_details
+        }
+
+        return JsonResponse(response_data)
+    except ViolenceEvent.DoesNotExist:
+        return JsonResponse({'error': 'ViolenceEvent not found'}, status=404)
+def recorded_video_by_id(id):
+    try:
+        # Convert the id parameter to an ObjectId
+        object_id = ObjectId(id)
+
+        # Retrieve the recorded video by its _id
+        event = RecordedVideo.objects.get(_id=object_id)
+
+        # Access the related video stream object
+        video_stream = event.videostream_ptr
+
+        # Construct and return the recorded video details
+        return {
+            '_id': str(event._id),
+            'path': event.path,
+            'video_stream': {
+                'name': video_stream.name,
+                'description': video_stream.description,
+                'createdAt': video_stream.createdAt,
+                # Add more fields as needed
+            }
+        }
+    except RecordedVideo.DoesNotExist:
+        return {}
+def get_all_violence_events(request):
+    try:
+        events = ViolenceEvent.objects.all()
+        events_list = []
+
+        for event in events:
+            event_details = {
+                '_id': str(event._id),
+                'cadence': event.cadence,
+                'violence': event.violence,
+                'non_violence': event.non_violence,
+                'path_frame': event.path_frame,
+                #'path_video': event.path_video,
+                'createdAt': event.createdAt,
+                'video_stream_id': recorded_video_by_id(str(event.video_stream_id))
+            }
+            events_list.append(event_details)
+
+        return JsonResponse({'events': events_list}, status=200)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+def get_folder_content(request, folder_path):
+    try:
+        # Vérifier que le chemin est un répertoire
+        if not os.path.isdir(folder_path):
+            return JsonResponse({'error': 'Le chemin spécifié n\'est pas un répertoire.'}, status=400)
+
+        # Lister le contenu du dossier
+        folder_content = os.listdir(folder_path)
+
+        # Renvoyer le contenu du dossier en tant que réponse JSON
+        return JsonResponse({'folder_path': folder_path, 'content': folder_content})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
