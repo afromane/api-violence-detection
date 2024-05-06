@@ -19,14 +19,20 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from .object_detect_with_yolo import YoloObjectDetection
 from .object_detect_with_ssd import SsdObjectDetection
-from .models import RecordedVideo,ViolenceEvent,VideoStream
+from .models import RecordedVideo,ViolenceEvent
+#from camera.models import CameraStream  
+
 from djongo.models import ObjectIdField
 from bson import ObjectId  # Import ObjectId from bson
 from django.core.serializers import serialize
 import json
 def home(request):
 
-    print(RecordedVideo.objects.all())
+    url="192.168.100.18:4747"
+
+
+    
+    
     return JsonResponse(
     {
         'message': 'Video processed successfully',
@@ -55,20 +61,19 @@ def upload(request):
                 description=request.POST.get('description'),
                 path=upload_dir+filename
             )
-            #recorded_video.save()
-            #save detected 
             _violence = analysis_result[0]
             _non_violence = analysis_result[1]
             _save_directory  = analysis_result[2]
+            _detection_times  = analysis_result[3]
             _cadence = request.POST.get("cadence")
-
+            
             violence_event  = ViolenceEvent.objects.create(
                 cadence = _cadence,
                 violence = _violence,
                 non_violence = _non_violence,
                 path_frame = _save_directory,
                 #path_video = models.TextField(blank=True)
-                #interval = models.ArrayField(model_container=models.FloatField(),default=list )
+                interval = _detection_times,
                 video_stream = recorded_video
             )
             latest_event = ViolenceEvent.objects.order_by('-createdAt').first()
@@ -246,7 +251,7 @@ def videoFromCameraWithYolo(request):
         detect = YoloObjectDetection()
         return detect.detect_person(frame)
 
-    def process_frames_mobilenet(video_url, frame_delay):
+    def process_frames_mobilenet(video_url,video_url_param, frame_delay):
         # Démarrer le flux vidéo à partir de l'URL
         vs = cv2.VideoCapture(video_url)
         detector = DectectViolenceAPI()
@@ -277,7 +282,6 @@ def videoFromCameraWithYolo(request):
                     violence_count += 1
                     # Ajouter les frames détectés à la liste
                     detected_frames.extend(frames_to_predict)
-
                     # Vérifier si le seuil de violence a été atteint dans l'intervalle de détection
                     if violence_count >= VIOLENCE_THRESHOLD:
                         # Calculer le temps écoulé depuis le début de la période
@@ -286,6 +290,9 @@ def videoFromCameraWithYolo(request):
                         # Si le temps écoulé est inférieur à l'intervalle de détection, lancer l'alerte
                         if elapsed_time < DETECTION_INTERVAL:
                             print("Alerte ! Plus de 10 cas de violence détectés en 1 minute.")
+                            #camera = CameraStream.objects.get(url=video_url_param)
+
+
                             # Réinitialiser le compteur de violence
                             violence_count = 0
                             # Réinitialiser le temps de début de la période
@@ -296,7 +303,8 @@ def videoFromCameraWithYolo(request):
                 frames_to_predict = []
 
                 # Dessiner la prédiction sur le cadre
-                frame = cv2.putText(frame, "Prediction: {}".format(prediction), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                frame = cv2.putText(frame, "Alert !!!", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+               # frame = cv2.putText(frame, "Prediction: {}".format(prediction), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
             
             ret, jpeg = cv2.imencode('.jpg', frame)
             frame_bytes = jpeg.tobytes()
@@ -318,7 +326,7 @@ def videoFromCameraWithYolo(request):
     if video_url_param:
         frame_delay = 1.0 / 30
         video_url = 'http://' + video_url_param + '/video'
-        return StreamingHttpResponse(process_frames_mobilenet(video_url, frame_delay), content_type='multipart/x-mixed-replace; boundary=frame')
+        return StreamingHttpResponse(process_frames_mobilenet(video_url,video_url_param, frame_delay), content_type='multipart/x-mixed-replace; boundary=frame')
     else:
         return HttpResponseBadRequest("Missing or invalid 'video_url' parameter ")
 
@@ -343,6 +351,10 @@ def save_detected_frames(frames, detection_start_time):
         # Enregistrer chaque frame détecté dans le répertoire spécifié
         for idx, frame in enumerate(frames):
             cv2.imwrite(os.path.join(save_directory, f'frame_{idx}.jpg'), frame)
+
+
+
+
 
 
 
@@ -650,16 +662,13 @@ def get_all_violence_events(request):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
-
 def get_folder_content(request, folder_path):
     try:
         # Vérifier que le chemin est un répertoire
         if not os.path.isdir(folder_path):
             return JsonResponse({'error': 'Le chemin spécifié n\'est pas un répertoire.'}, status=400)
-
         # Lister le contenu du dossier
         folder_content = os.listdir(folder_path)
-
         # Renvoyer le contenu du dossier en tant que réponse JSON
         return JsonResponse({'folder_path': folder_path, 'content': folder_content})
     except Exception as e:

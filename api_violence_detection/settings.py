@@ -44,7 +44,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'detect_violence',
-    'camera',
+    'setting',
+    'find_people',
     'corsheaders', # Pour resoudre le probleme du cors
     'djongo',# database
 ]
@@ -81,7 +82,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'api_violence_detection.wsgi.application'
 
-
 # Database
 # https://docs.djangoproject.com/en/2.2/ref/settings/#databases
 
@@ -96,7 +96,7 @@ DATABASES = {
     'default': {
         'ENGINE': 'djongo',
         'CLIENT': {
-            'host': '192.168.100.11', # Replace with your MongoDB server address
+            'host': '192.168.100.10', # Replace with your MongoDB server address
             # 'host': 'localhost', # Replace with your MongoDB server address
             'port': 27017,               # Replace with your MongoDB port if different
             #'username': 'your_username', # Replace with your MongoDB username (optional)

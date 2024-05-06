@@ -73,7 +73,6 @@ class DectectViolenceAPI:
                 predicted_label_index = np.argmax(average_predicted_probabilities)
 
                 predicted_label = self.CLASSES_LIST[predicted_label_index]
-
                 if predicted_label == "Violence":
                     violence_count += 1
                     detected_frames.append(frame)
