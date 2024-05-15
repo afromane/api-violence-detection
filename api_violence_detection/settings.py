@@ -27,6 +27,7 @@ DEBUG = True
 
 ALLOWED_HOSTS = [
     '192.168.100.21',
+    '192.168.1.102',
     '127.0.0.1'
 ]
 CORS_ALLOWED_ORIGINS = [
@@ -45,7 +46,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'detect_violence',
     'setting',
-    'find_people',
+    'statistic',
+    'individual_search',
     'corsheaders', # Pour resoudre le probleme du cors
     'djongo',# database
 ]
@@ -96,7 +98,7 @@ DATABASES = {
     'default': {
         'ENGINE': 'djongo',
         'CLIENT': {
-            'host': '192.168.100.10', # Replace with your MongoDB server address
+            'host': '192.168.100.13', # Replace with your MongoDB server address
             # 'host': 'localhost', # Replace with your MongoDB server address
             'port': 27017,               # Replace with your MongoDB port if different
             #'username': 'your_username', # Replace with your MongoDB username (optional)

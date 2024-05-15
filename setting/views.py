@@ -9,7 +9,7 @@ from django.http import StreamingHttpResponse,HttpResponseBadRequest
 from django.http import FileResponse
 import time
 from datetime import datetime
-from .models import Camera,Secteur
+from .models import Camera,Secteur,ContactUrgence
 from djongo.models import ObjectIdField
 from bson import ObjectId  # Import ObjectId from bson
 from django.core.serializers import serialize
@@ -52,6 +52,7 @@ def get_all_camera(request):
         return JsonResponse({'camera': camera_list}, status=200)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
 def delete_camera(request):
     try:
         # Récupérer l'objet Secteur à 
@@ -98,3 +99,41 @@ def delete_secteur(request):
         return HttpResponse("Le secteur a été supprimé avec succès.")
     except Secteur.DoesNotExist:
         return HttpResponse("Le secteur spécifié n'existe pas.", status=404)
+
+
+@csrf_exempt
+def save_contact(request):
+    if request.method == 'POST':
+
+        contact = ContactUrgence.objects.create(
+            name= request.POST.get('name'),
+            responsable=request.POST.get('responsable'),
+            telephone=request.POST.get('telephone'),
+            email=request.POST.get('email'),
+        )
+        return JsonResponse({
+            'message': 'Form data received successfully',
+            'code' : 200
+            }, status=200)
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+def get_all_contact(request):
+    try:
+        contact = ContactUrgence.objects.all()
+        contact_list = []
+
+        for contact in contact:
+            contact_details = {
+                '_id': str(contact._id),
+                'name': contact.name,
+                'responsable': contact.responsable,
+                'telephone': contact.telephone,
+                'email': contact.email
+                #'description': contact.videostream_ptr.description
+            }
+            contact_list.append(contact_details)
+
+        return JsonResponse({'contact': contact_list}, status=200)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

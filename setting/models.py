@@ -30,3 +30,18 @@ class Secteur(models.Model):
     class Meta:
         verbose_name = "Secteur "
         verbose_name_plural = "Secteur "
+
+class ContactUrgence(models.Model):
+    """
+    Modèle pour représenter un contact d'urgence.
+    """
+    name = models.TextField()
+    responsable = models.TextField()
+    email = models.TextField()
+    telephone = models.TextField()
+    _id = models.ObjectIdField(primary_key=True)
+    createdAt = models.DateTimeField(auto_now_add=True, blank=True)
+
+    class Meta:
+        verbose_name = "Contact "
+        verbose_name_plural = "Contact "
